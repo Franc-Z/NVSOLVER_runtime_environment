@@ -3,7 +3,7 @@
 
 > 操作系统：Ubuntu 24.04 (必须为24.04，不能是22.04) 
 > 基础镜像：`nvcr.io/nvidia/base/ubuntu:noble-20250619`
-
+```
 ---
 
 ## 1. 容器内系统更新
@@ -11,7 +11,7 @@
 ```bash
 apt update && apt upgrade -y
 apt install -y wget
-```
+
 
 ---
 
@@ -77,4 +77,5 @@ CUDA Toolkit	最低驱动（native）	可用 forward-compat 驱动的下限
 sudo apt install cuda-compat-12-8
 export LD_LIBRARY_PATH=/usr/local/cuda-12.8/compat:$LD_LIBRARY_PATH
 ```
+
 
