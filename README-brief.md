@@ -11,7 +11,7 @@
 ```bash
 apt update && apt upgrade -y
 apt install -y wget
-
+```
 
 ---
 
@@ -77,5 +77,6 @@ CUDA Toolkit	最低驱动（native）	可用 forward-compat 驱动的下限
 sudo apt install cuda-compat-12-8
 export LD_LIBRARY_PATH=/usr/local/cuda-12.8/compat:$LD_LIBRARY_PATH
 ```
+
 
 
