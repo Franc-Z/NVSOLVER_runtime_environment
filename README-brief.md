@@ -42,10 +42,10 @@ conda activate cufolio
 ## 4. 替换/补充 CVXPY 文件
 
 操作	目标路径	
-用自定义 `defines.py` 覆盖	`/root/miniconda3/envs/cufolio/lib/python3.12/site-packages/cvxpy/reductions/solvers/defines.py`	
-用自定义 `settings.py` 覆盖	`/root/miniconda3/envs/cufolio/lib/python3.12/site-packages/cvxpy/settings.py`	
-拷贝 `nvsolver_conif.py` 到	`/root/miniconda3/envs/cufolio/lib/python3.12/site-packages/cvxpy/reductions/solvers/conic_solvers/nvsolver_conif.py`	
-拷贝 `clarabel_gpu.cpython-312-x86_64-linux-gnu.so` 与 `clarabel_solver.py` 到	`/root/miniconda3/envs/cufolio/lib/python3.12/site-packages/`	
+用自定义 `defines.py` 覆盖	`/root/miniconda3/envs/cufolio/lib/python3.12/site-packages/cvxpy/reductions/solvers/defines.py` ；
+用自定义 `settings.py` 覆盖	`/root/miniconda3/envs/cufolio/lib/python3.12/site-packages/cvxpy/settings.py` ；
+拷贝 `nvsolver_conif.py` 到	`/root/miniconda3/envs/cufolio/lib/python3.12/site-packages/cvxpy/reductions/solvers/conic_solvers/nvsolver_conif.py`	；
+拷贝 `clarabel_gpu.cpython-312-x86_64-linux-gnu.so` 与 `clarabel_solver.py` 到	`/root/miniconda3/envs/cufolio/lib/python3.12/site-packages/`	。
 
 ---
 
@@ -77,6 +77,7 @@ CUDA Toolkit	最低驱动（native）	可用 forward-compat 驱动的下限
 sudo apt install cuda-compat-12-8
 export LD_LIBRARY_PATH=/usr/local/cuda-12.8/compat:$LD_LIBRARY_PATH
 ```
+
 
 
 
