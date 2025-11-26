@@ -7,7 +7,7 @@
 
 ---
 
-## 2. 安装 Miniconda（Python 3.12）
+## 2. 安装 Miniconda（Python 3.13）
 
 ```bash
 wget https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-py313_25.9.1-1-Linux-x86_64.sh
@@ -70,3 +70,4 @@ CUDA Toolkit    最低驱动（native）    可用 forward-compat 驱动的下�
 sudo apt install cuda-compat-12-8
 export LD_LIBRARY_PATH=/usr/local/cuda-12.8/compat:$LD_LIBRARY_PATH
 ```
+
