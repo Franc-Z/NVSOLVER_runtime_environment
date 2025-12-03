@@ -149,7 +149,7 @@ class NVSOLVER(ConicSolver):
             import os
             sys.path.insert(0, '/opt/miniconda3/envs/cufolio/lib/python3.12/site-packages')
             import clarabel_gpu
-            _NVSOLVER_CORE = clarabel_gpu.PyGPUSolver
+            _NVSOLVER_CORE = clarabel_gpu.ClarabelGPU
         except ImportError:
             pass
 
@@ -400,7 +400,7 @@ class NVSOLVER(ConicSolver):
 @misc{nvsolver2024,
     author = {NVIDIA and Clarabel Developers},
     title = {{NVSolver: GPU-accelerated Interior Point Solver for CVXPy}},
-    year = {2024},
+    year = {2025},
     note = {Ultra-fast version optimized for DPP parameter updates.}
 }
         """
