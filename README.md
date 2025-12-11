@@ -1,13 +1,13 @@
 
 # 1. 构建 cufolio 镜像步骤
 
-> 操作系统：rockylinux:10-ubi 
+> 操作系统：rockylinux:10-ubi （附件中clarabel_gpu.so支持glibc >=2.28的所有linux系统，python版本支持3.11~3.13）
 > 基础镜像：`rockylinux/rockylinux:10-ubi`
 
 
 ---
 
-## 2. 安装 Miniconda（Python 3.13）
+## 2. 安装 Miniconda（以Python 3.13为例）
 
 ```bash
 wget https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-py313_25.9.1-1-Linux-x86_64.sh
@@ -70,5 +70,6 @@ CUDA Toolkit    最低驱动（native）    可用 forward-compat 驱动的下�
 sudo apt install cuda-compat-12-8
 export LD_LIBRARY_PATH=/usr/local/cuda-12.8/compat:$LD_LIBRARY_PATH
 ```
+
 
 
