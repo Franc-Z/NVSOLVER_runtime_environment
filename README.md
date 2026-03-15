@@ -1,6 +1,6 @@
 # Building the cuFOLIO Runtime Image
 
-> Supported OS: Ubuntu 22.04–24.04, RockyLinux 8–10 etc.
+> Supported OS: Ubuntu 22.04–24.04, RockyLinux 8–10, CentOS 8-10 etc.
 
 ---
 
