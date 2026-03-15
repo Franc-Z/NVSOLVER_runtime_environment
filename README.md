@@ -43,20 +43,7 @@ source ~/miniconda3/bin/activate
 
 ## 4. Create and Activate the `cufolio` Environment
 
-CUDA 13.0 version:
-
-```bash
-conda create -n cufolio \
-  -c rapidsai -c conda-forge -c nvidia \
-  numpy scipy cupy rmm=25.10 \
-  cvxpy=1.7.5 openmp fmt \
-  cuda-version=13.0 python=3.12
-
-conda init bash
-conda activate cufolio
-```
-
-Or with CUDA 12.8:
+The shared library is built with CUDA 12.8:
 
 ```bash
 conda create -n cufolio \
