@@ -1,4 +1,4 @@
-# Building the cuFOLIO Runtime Environment (SM_80/86/89/90/100/120)
+# Building the cuFOLIO Runtime Environment (SM_75/80/86/89/90/120)
 
 > Supported OS: Ubuntu 22.04–24.04, RockyLinux 8–10, CentOS 8-10 etc.
 
