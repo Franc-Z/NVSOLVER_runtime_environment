@@ -269,14 +269,17 @@ class ClarabelGPU(ConicSolver):
             opt_val = (primal_val + inverse_data[s.OFFSET]
                        if primal_val is not None else None)
 
+            x_sol = solution.get("x")
+            if x_sol is not None and not isinstance(x_sol, np.ndarray):
+                x_sol = np.asarray(x_sol.get()) if hasattr(x_sol, 'get') else np.asarray(x_sol)
             primal_vars = {
-                inverse_data[ClarabelGPU.VAR_ID]: solution.get("x"),
+                inverse_data[ClarabelGPU.VAR_ID]: x_sol,
             }
 
             z = solution.get("z")
             if z is not None:
                 if not isinstance(z, np.ndarray):
-                    z = np.asarray(z)
+                    z = np.asarray(z.get()) if hasattr(z, 'get') else np.asarray(z)
                 dims = inverse_data[ConicSolver.DIMS]
                 eq_dual_vars = utilities.get_dual_values(
                     z[:dims.zero],
