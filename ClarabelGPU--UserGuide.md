@@ -414,6 +414,143 @@ solver.reset_memory_pool()  # Release unused pool memory back to the OS
 > (including cuDSS internal buffers), use `rmm.statistics` on the Python side
 > or DiffSolver's `get_memory_stats()['rmm_current_mb']`.
 
+### 3.2 Complete API Reference
+
+#### Cone Type Classes
+
+All cone classes are importable from `clarabel_gpu`:
+
+```python
+from clarabel_gpu import (
+    ZeroConeT, NonnegativeConeT, SecondOrderConeT,
+    ExponentialConeT, PowerConeT, PSDTriangleConeT,
+    GenPowerConeT,  # defined but not yet supported
+)
+```
+
+| Class | Constructor | Dimension | Description |
+|-------|------------|-----------|-------------|
+| `ZeroConeT(n)` | `n`: int | $n$ | Zero cone $\{0\}^n$ (equality constraints) |
+| `NonnegativeConeT(n)` | `n`: int | $n$ | Nonnegative orthant $\mathbb{R}_+^n$ (inequalities) |
+| `SecondOrderConeT(n)` | `n`: int | $n$ | Second-order cone $\{(t,x) : \|x\|_2 \le t\}$ |
+| `ExponentialConeT()` | — | 3 | Exponential cone $\{(x,y,z) : ye^{x/y} \le z\}$ |
+| `PowerConeT(a)` | `a`: float ∈ (0,1) | 3 | Power cone $\{(x,y,z) : x^a y^{1-a} \ge |z|\}$ |
+| `PSDTriangleConeT(n)` | `n`: int (matrix dim) | $n(n+1)/2$ | PSD cone (upper-triangular scaled) |
+| `GenPowerConeT(a, n)` | `a`: list, `n`: int | — | **Not yet supported** (raises `NotImplementedError`) |
+
+#### `ClarabelGPU` Class — Complete Method Reference
+
+| Method | Description |
+|--------|-------------|
+| `setup(P, q, A, b, cone_dims, gpu_mode=False, **settings)` | Initialize solver with problem data. See §3.1 for details. |
+| `solve() → dict` | Solve the problem. Returns result dict (see below). |
+| `update_q(q_new)` | Update linear cost vector. Accepts NumPy or CuPy array. Applies equilibration scaling. |
+| `update_b(b_new)` | Update constraint RHS. Accepts NumPy or CuPy array. Handles cone row permutation + equilibration. |
+| `update_P(P_new)` | Update P matrix values (same sparsity pattern). Syncs KKT matrix. Always CPU path. |
+| `update_A(A_new)` | Update A matrix values (same sparsity pattern). Syncs KKT + At matrices. Always CPU path. |
+| `rebuild(P, q, A, b, cone_dims, **settings)` | Rebuild solver from scratch, reusing elimination-tree cache. Use when sparsity pattern changes. |
+| `set_verbose(bool)` | Toggle verbose output at runtime. |
+| `get_verbose() → bool` | Query current verbose setting. |
+| `get_memory_info() → dict or None` | Return RMM/CuPy GPU memory usage statistics. |
+| `reset_memory_pool()` | Release unused RMM pool memory. |
+| `solve_cbf(path, **settings) → dict` | Load a CBF file and solve in one call. See §4. |
+
+#### `solve()` Return Dictionary
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `'status'` | `str` | `'solved'`, `'primal_infeasible'`, `'dual_infeasible'`, `'almost_solved'`, `'almost_primal_infeasible'`, `'almost_dual_infeasible'`, `'max_iterations'`, `'max_time'`, `'numerical_error'`, `'insufficient_progress'` |
+| `'obj_val'` | `float` | Primal objective value |
+| `'obj_val_dual'` | `float` | Dual objective value |
+| `'solve_time'` | `float` | Internal solve time (seconds, excludes Python overhead) |
+| `'iterations'` | `int` | Number of IPM iterations |
+| `'r_prim'` | `float` | Primal residual |
+| `'r_dual'` | `float` | Dual residual |
+| `'x'` | `ndarray` | Primal variables (NumPy if `gpu_mode=False`, CuPy if `True`) |
+| `'z'` | `ndarray` | Dual variables |
+| `'s'` | `ndarray` | Slack variables |
+
+#### Solver Settings (passed as `**settings` to `setup()` / `rebuild()`)
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| **Main** | | |
+| `verbose` | `False` | Print iteration progress |
+| `max_iter` | `200` | Maximum IPM iterations |
+| `time_limit` | `inf` | Wall-clock time limit (seconds) |
+| `max_step_fraction` | `0.99` | Maximum step size (0, 1] |
+| **Tolerances (full accuracy)** | | |
+| `tol_gap_abs` | `1e-8` | Absolute duality gap tolerance |
+| `tol_gap_rel` | `1e-8` | Relative duality gap tolerance |
+| `tol_feas` | `1e-8` | Primal/dual feasibility tolerance |
+| `tol_infeas_abs` | `1e-8` | Absolute infeasibility tolerance |
+| `tol_infeas_rel` | `1e-8` | Relative infeasibility tolerance |
+| `tol_ktratio` | `1e-6` | κ/τ ratio tolerance |
+| **Tolerances (reduced accuracy)** | | |
+| `reduced_tol_gap_abs` | `5e-5` | |
+| `reduced_tol_gap_rel` | `5e-5` | |
+| `reduced_tol_feas` | `1e-4` | |
+| `reduced_tol_infeas_abs` | `5e-12` | |
+| `reduced_tol_infeas_rel` | `5e-5` | |
+| `reduced_tol_ktratio` | `1e-4` | |
+| **Equilibration** | | |
+| `equilibrate_enable` | `False` | Enable Ruiz equilibration |
+| `equilibrate_max_iter` | `10` | Number of Ruiz iterations |
+| `equilibrate_min_scaling` | `1e-4` | Minimum scaling factor |
+| `equilibrate_max_scaling` | `1e4` | Maximum scaling factor |
+| **Step size** | | |
+| `min_terminate_step_length` | `1e-4` | Step length below which to terminate |
+| `linesearch_backtrack_step` | `0.8` | Line search backtracking factor |
+| **Static regularization** | | |
+| `sr_enable` | `True` | Enable static KKT regularization |
+| `sr_constant` | `1e-8` | Regularization constant ε |
+| `sr_proportional` | `≈2.2e-32` | Proportional regularization (ε²) |
+| **Dynamic regularization** | | |
+| `dr_enable` | `True` | Enable dynamic regularization |
+| `dr_eps` | `1e-13` | Dynamic regularization ε |
+| `dr_delta` | `2e-7` | Dynamic regularization δ |
+| **Iterative refinement** | | |
+| `ir_enable` | `True` | Enable KKT iterative refinement |
+| `ir_reltol` | `1e-13` | IR relative tolerance |
+| `ir_abstol` | `1e-12` | IR absolute tolerance |
+| `ir_max_iter` | `5` | Maximum IR iterations |
+| `ir_stop_ratio` | `5.0` | IR improvement ratio threshold |
+| **Chordal decomposition** | | |
+| `chordal_decomposition_enable` | `False` | Enable PSD chordal decomposition |
+| `chordal_decomposition_merge_method` | `'clique_graph'` | Merge strategy |
+| `chordal_decomposition_compact` | `True` | Use compact representation |
+| `chordal_decomposition_complete_dual` | `False` | Complete dual variables |
+
+#### Module-Level Functions
+
+| Function | Description |
+|----------|-------------|
+| `load_cbf(path) → dict` | Load a CBF file and return problem data as Python objects (SciPy/NumPy). See §4. |
+
+#### `UpdateHint` Enum
+
+Used with CVXPY warm-start to skip data comparison. See §7.1.
+
+```python
+from clarabel_gpu import UpdateHint
+
+problem.solve(
+    solver="CLARABELGPU",
+    warm_start=True,
+    update_hints={UpdateHint.q_values_changed, UpdateHint.b_values_changed},
+)
+```
+
+| Member | Description |
+|--------|-------------|
+| `automatic` | Fall back to comparison-based detection |
+| `P_pattern_changed` | P sparsity pattern changed → triggers `rebuild()` |
+| `P_values_changed` | P numerical values changed → triggers `update_P()` |
+| `A_pattern_changed` | A sparsity pattern changed → triggers `rebuild()` |
+| `A_values_changed` | A numerical values changed → triggers `update_A()` |
+| `q_values_changed` | q vector changed → triggers `update_q()` |
+| `b_values_changed` | b vector changed → triggers `update_b()` |
+
 ---
 
 ## 4. CBF File Format Support
