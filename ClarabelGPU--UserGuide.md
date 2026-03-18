@@ -232,23 +232,23 @@ The corresponding `reduced_tol_*` parameters are used when full accuracy cannot 
 
 ### 2.5 RMM Memory Pool
 
-**Automatic pool initialization**: Starting from the current version, the solver automatically detects whether a high-performance RMM memory resource is active. If not (i.e., the default bare `cudaMalloc` allocator), it upgrades to a `pool_memory_resource<cuda_async_memory_resource>` with adaptive sizing (50% of free GPU memory as initial pool, 90% as maximum). This means **no manual RMM setup is required** for basic C++ usage.
+**Automatic pool initialization**: Starting from the current version, the solver automatically detects whether a high-performance RMM memory resource is active. If not (i.e., the default bare `cudaMalloc` allocator), it upgrades to a `pool_memory_resource<cuda_memory_resource>` with a fixed 256 MB initial pool (grows on demand up to 90% of free GPU memory). This means **no manual RMM setup is required** for basic C++ usage.
 
 If you prefer explicit control, you can set up the pool before creating the solver:
 
 ```cpp
-#include <rmm/mr/device/cuda_async_memory_resource.hpp>
+#include <rmm/mr/device/cuda_memory_resource.hpp>
 #include <rmm/mr/device/pool_memory_resource.hpp>
 
 // Adaptive: query available GPU memory
 size_t free_bytes = 0, total_bytes = 0;
 cudaMemGetInfo(&free_bytes, &total_bytes);
 
-auto upstream = std::make_shared<rmm::mr::cuda_async_memory_resource>();
+auto upstream = std::make_shared<rmm::mr::cuda_memory_resource>();
 auto pool = std::make_unique<rmm::mr::pool_memory_resource<
-    rmm::mr::cuda_async_memory_resource>>(
+    rmm::mr::cuda_memory_resource>>(
     upstream.get(),
-    free_bytes / 2,       // initial: 50% of free GPU memory
+    256 << 20,            // initial: 256 MB
     free_bytes * 9 / 10   // maximum: 90% of free GPU memory
 );
 rmm::mr::set_current_device_resource(pool.get());
@@ -377,10 +377,10 @@ avoiding CPU↔GPU round trips entirely.
 
 | Method | Input | What is Updated |
 |--------|-------|-----------------|
-| `update_P_gpu(P_gpu)` | CuPy sparse matrix or CuPy 1-D array | $P$ matrix nonzero values (GPU→GPU) |
-| `update_q_gpu(q_gpu)` | CuPy 1-D array of length $n$ | Linear cost vector $q$ (GPU→GPU) |
-| `update_A_gpu(A_gpu)` | CuPy sparse matrix or CuPy 1-D array | $A$ matrix nonzero values (GPU→GPU) |
-| `update_b_gpu(b_gpu)` | CuPy 1-D array of length $m$ | Constraint RHS vector $b$ (GPU→GPU) |
+| `update_P(P_new)` | NumPy/SciPy or CuPy array | $P$ matrix nonzero values (auto-detects GPU/CPU) |
+| `update_q(q_new)` | NumPy or CuPy array of length $n$ | Linear cost vector $q$ (GPU direct if CuPy) |
+| `update_A(A_new)` | NumPy/SciPy or CuPy array | $A$ matrix nonzero values (always syncs KKT) |
+| `update_b(b_new)` | NumPy or CuPy array of length $m$ | Constraint RHS vector $b$ (GPU direct if CuPy, handles cone permutation) |
 
 ```python
 import cupy as cp
@@ -388,8 +388,8 @@ import cupy as cp
 q_gpu = cp.asarray(q_new)
 b_gpu = cp.asarray(b_new)
 
-solver.update_q_gpu(q_gpu)    # GPU-to-GPU direct transfer
-solver.update_b_gpu(b_gpu)
+solver.update_q(q_gpu)    # auto-detects CuPy → GPU direct transfer
+solver.update_b(b_gpu)
 result = solver.solve()
 ```
 
@@ -1064,7 +1064,7 @@ problem.solve(
 ### 7.3 GPU Mode and Memory Management
 
 - With `gpu_mode=True`, solution vectors are returned as CuPy arrays (data remains on GPU)
-- Use `update_*_gpu()` methods for GPU-to-GPU direct transfer updates, avoiding CPU-GPU round trips
+- Pass CuPy arrays to `update_q()` / `update_b()` for GPU-to-GPU direct transfer, avoiding CPU-GPU round trips
 - The solver automatically initializes an RMM pool if none is configured. For advanced control or PyTorch/CuPy interop, see §2.5
 
 ### 7.4 Data Equilibration
