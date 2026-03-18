@@ -1121,3 +1121,35 @@ The CVXPY integration layer handles ordering automatically.
 ### Q6: Can solver instances be shared across threads?
 
 No. Both `Solver` and `ClarabelGPU` are **not thread-safe**. In multi-threaded scenarios, create a separate instance per thread.
+
+### Q7: I get `cusparseSpMV(): dimension mismatch, matA.rows != vecY.size`. What happened?
+
+This error means the internal constraint matrix A has a different number of rows than the solver expects. Common causes and solutions:
+
+**Cause 1: Calling `update_A()` after the constraint structure changed.**
+
+`update_A()` only updates the **numerical values** of the existing CSR matrix — the sparsity pattern (row count, column indices, indptr) is fixed at `setup()` time. If your new A has different dimensions or nnz, use `rebuild()` instead:
+
+```python
+# ✗ Wrong: A dimensions changed, but using update_A
+solver.update_A(A_new)  # → dimension mismatch error
+
+# ✓ Correct: use rebuild() when structure changes
+solver.rebuild(P, q, A_new, b, cones, **settings)
+```
+
+**Cause 2: Chordal decomposition augmented the problem internally.**
+
+When `chordal_decomposition_enable=True` and the problem has PSD cones, the solver may decompose large PSD cones into smaller ones, **adding extra rows** to A internally. The internal A dimensions no longer match the user-supplied A. In this case, do not call `update_A()` — either:
+
+- Disable chordal decomposition: `chordal_decomposition_enable=False`
+- Or use `rebuild()` which correctly re-applies the decomposition
+
+**Summary: when to use `update_*()` vs `rebuild()`**
+
+| Scenario | Method | Notes |
+|----------|--------|-------|
+| Only q or b values change | `update_q()` / `update_b()` | Fastest: no KKT refactorization needed |
+| P or A values change (same pattern) | `update_P()` / `update_A()` | KKT values updated, refactorization on next solve |
+| A sparsity pattern changes (same dims) | `rebuild()` | Reuses elimination-tree cache (~50-80% ANALYSIS savings) |
+| Problem dimensions change | New `setup()` | Full rebuild from scratch |
