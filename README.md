@@ -105,10 +105,6 @@ solvers = cp.installed_solvers()
 print(solvers)                      # Should contain 'CLARABELGPU'
 assert 'CLARABELGPU' in solvers
 
-# Verify DiffSolver (differentiable solver, optional)
-from diff_solver import DiffSolver, has_cuda, cuda_device_count
-print(f"CUDA available: {has_cuda()}")
-print(f"GPU count:      {cuda_device_count()}")
 ```
 
 ---
