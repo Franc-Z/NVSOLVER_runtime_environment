@@ -15,7 +15,7 @@ apt update && apt install -y wget
 
 ---
 
-## 2. Install cuDSS
+## 2. Install cuDSS (taking Ubuntu 22.04 as example)
 
 cuDSS (CUDA Sparse Direct Solver) must be installed separately (see [cuDSS Downloads](https://developer.nvidia.com/cudss-downloads)):
 
