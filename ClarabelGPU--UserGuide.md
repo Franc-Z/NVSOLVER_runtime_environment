@@ -14,6 +14,7 @@
 6. [Constraint Tightness Analysis](#6-constraint-tightness-analysis)
 7. [Performance Optimization Tips](#7-performance-optimization-tips)
 8. [Frequently Asked Questions](#8-frequently-asked-questions)
+9. [Floating-Point Determinism](#9-floating-point-determinism)
 
 ---
 
@@ -1198,6 +1199,71 @@ problem.solve(
 - Typical speedup: 2x–10x over the initial solve
 - For CVXPY DPP, declare frequently-changing inputs as `cp.Parameter` and use `warm_start=True`
 
+#### Accelerating DPP First-Time Compilation with `canon_backend="COO"`
+
+When many problem inputs are declared as `cp.Parameter`, CVXPY's DPP first-time compilation can be extremely slow. This is because the internal "problem data tensor" has shape `(constraints × (variables+1), param_size+1)`, and its construction involves traversing the full expression tree.
+
+A common scenario in Barra factor-model portfolio optimization is to declare the **factor exposure matrix** `F` as a parameter (e.g., to update exposures daily):
+
+```python
+n, k = 5805, 41
+F_param = cp.Parameter((n, k), name="F")          # n×k = 237,905 elements
+L_Omega_param = cp.Parameter((k, k), name="L_Omega")  # k×k = 1,681 elements
+d_sqrt_param = cp.Parameter(n, nonneg=True)            # n = 5,805 elements
+mu_param = cp.Parameter(n)                             # n = 5,805 elements
+# ... total param_size ≈ 262,907
+```
+
+With ~263K parameters, the first-time DPP compilation (ConeMatrixStuffing) takes **39–71 seconds** with the default CPP backend. This is a one-time cost per Python process (CVXPY caches the compiled `ParamConeProg` for subsequent solves), but it severely impacts startup time.
+
+**CVXPY 1.8+ introduces the COO canonicalization backend** (`canon_backend="COO"`), which uses a 3D COO sparse tensor representation. For parameter-heavy problems, it performs O(nnz) operations instead of O(m × n × p), reducing first-time compilation by **3–10x**:
+
+```python
+# First solve: use COO backend for faster DPP compilation
+problem.solve(
+    solver='CLARABELGPU',
+    canon_backend='COO',    # 3D sparse tensor backend (CVXPY >= 1.8)
+    verbose=True,
+    **settings
+)
+
+# Subsequent solves: COO also works (but compilation is cached anyway)
+problem.solve(
+    solver='CLARABELGPU',
+    canon_backend='COO',
+    warm_start=True,
+    update_hints={UpdateHint.q_values_changed, UpdateHint.A_values_changed,
+                  UpdateHint.b_values_changed},
+    **settings
+)
+```
+
+**Benchmark** (n=5805 stocks, k=41 factors, ~263K parameter elements):
+
+| Backend | First-Time Compilation | Subsequent Solves | Notes |
+|---------|----------------------|-------------------|-------|
+| `CPP` (default) | ~39 s (QP), ~71 s (SOCP) | ~2 ms (cached) | Default in CVXPY ≤ 1.7 |
+| `COO` | ~5–10 s (QP), ~10–20 s (SOCP) | ~2 ms (cached) | CVXPY ≥ 1.8 required |
+| Native `ClarabelGPU` | ~0.2 s (compile structure) | ~5–20 ms (update) | Bypasses CVXPY entirely |
+
+**Version-portable usage** — auto-detect COO support:
+
+```python
+import cvxpy as cp
+
+_CANON_BACKEND = None
+try:
+    _cv = tuple(int(x) for x in cp.__version__.split(".")[:2])
+    if _cv >= (1, 8):
+        _CANON_BACKEND = "COO"
+except Exception:
+    pass
+
+problem.solve(solver='CLARABELGPU', canon_backend=_CANON_BACKEND, **settings)
+```
+
+> **When to use the native interface instead**: If the problem structure is known at design time (e.g., Barra QP/SOCP), the fastest path is to bypass CVXPY entirely and construct P, q, A, b directly using the `ClarabelGPU` native Python API (§3.1) or the `PortfolioConicBuilder` module. This reduces first-time setup from tens of seconds to ~200 ms.
+
 ### 7.3 GPU Mode and Memory Management
 
 - With `gpu_mode=True`, solution vectors are returned as CuPy arrays (data remains on GPU)
@@ -1290,3 +1356,82 @@ When `chordal_decomposition_enable=True` and the problem has PSD cones, the solv
 | P or A values change (same pattern) | `update_P()` / `update_A()` | KKT values updated, refactorization on next solve |
 | A sparsity pattern changes (same dims) | `rebuild()` | Reuses elimination-tree cache (~50-80% ANALYSIS savings) |
 | Problem dimensions change | New `setup()` | Full rebuild from scratch |
+
+---
+
+## 9. Floating-Point Determinism
+
+### 9.1 Background: Why GPU Results May Differ Between Runs
+
+Floating-point addition and multiplication are **not strictly associative** due to finite-precision rounding: `(a + b) + c` may not equal `a + (b + c)`. On GPUs, parallel reduction operations (sums, dot products, norms) process elements across thousands of threads. If the order of reduction varies between runs — due to thread scheduling, warp execution order, or atomics — the final result can differ at the last few bits of precision.
+
+For a **single optimization solve**, this effect is negligible (differences are at machine epsilon, ~1e-16 for `float64`). However, in **sequential parametric solves** (e.g., daily portfolio rebalancing over 1000+ days), the solver output `w_t` becomes the input `w_prev` for the next problem. Tiny per-solve differences compound through this feedback loop, potentially producing visible cumulative divergence (0.5–1% over 1000 sequential solves in our testing).
+
+### 9.2 Sources of Non-Determinism in ClarabelGPU
+
+| Source | Component | Impact |
+|--------|-----------|--------|
+| **Parallel reductions** | `thrust::transform_reduce` in norm/dot-product computations | Thread-scheduling-dependent association order |
+| **Sparse factorization** | cuDSS LDL factorization | Internal parallel algorithms may be non-deterministic |
+| **Atomic operations** | Potential use in certain CUB code paths | Unordered execution across threads |
+
+### 9.3 Determinism Levels in NVIDIA CCCL
+
+NVIDIA's CUDA Core Compute Libraries (CCCL) 3.1+ provides three determinism levels for `cub::DeviceReduce`:
+
+| Level | Guarantee | Performance | Mechanism |
+|-------|-----------|-------------|-----------|
+| `not_guaranteed` | None | Fastest | Atomics, single kernel |
+| `run_to_run` (default) | Same result on same GPU | Good | Fixed hierarchical tree reduction |
+| `gpu_to_gpu` | Same result across different GPUs | ~20-30% slower | Reproducible Floating-point Accumulator (RFA) |
+
+Reference: [Controlling Floating-Point Determinism in NVIDIA CCCL](https://developer.nvidia.com/blog/controlling-floating-point-determinism-in-nvidia-cccl/)
+
+### 9.4 Determinism Measures in ClarabelGPU
+
+ClarabelGPU uses `cub::DeviceReduce` (two-phase API, `run_to_run` deterministic by default) for all critical reduction operations in the solver's hot path:
+
+**Deterministic reductions (`cub::DeviceReduce`):**
+- `info.cu` — 8 scaled norms per iteration (convergence metrics)
+- `residuals.cu` — 4 fused dot products per iteration (b·z, s·z, q·x, x·Px)
+- `kkt_system.cu` — 7 dot products for Δτ, Δκ computation
+- `problem_data.cu` — equilibration column norms
+
+**Remaining non-deterministic components:**
+- `variables.cu` — μ computation (`thrust::transform_reduce`)
+- cuDSS sparse factorization internals — outside ClarabelGPU's control
+
+### 9.5 Practical Implications
+
+#### Single solve
+
+No practical impact. The solution is within the specified tolerance (e.g., `tol_feas = 1e-8`) regardless of reduction order.
+
+#### Sequential parametric solves (backtesting)
+
+In a 1258-day portfolio optimization backtest with n = 5805 stocks:
+
+| Comparison | CumRet Divergence | Cause |
+|------------|------------------|-------|
+| ClarabelGPU run-to-run (5 runs) | ~1% range | GPU FP non-determinism + feedback amplification |
+| ClarabelGPU vs MOSEK | ~0.3% (mean) | Different IPM algorithms + numerical backends |
+| ClarabelGPU vs CLARABEL (CPU) | ~0.2–0.4% | cuDSS vs CPU LDL + reduction differences |
+| SOCP model (P = 0, all solvers) | ~0% | No quadratic objective → less sensitivity |
+
+Key observations:
+- **QP (P ≠ 0) is more sensitive** than SOCP (P = 0) because the quadratic objective creates smoother optimal surfaces where multiple points within the tolerance ball are equally optimal.
+- **Divergence scales with the number of sequential solves**, not with problem size.
+- **Tightening solver tolerance** (e.g., `1e-10`) reduces per-solve differences but may cause `ALMOST_SOLVED` status on CPU solvers.
+
+#### Recommendations
+
+1. **Accept the variability**: For backtesting and research, ~1% cumulative divergence over 1000+ sequential solves is within normal numerical variability. Report results as ranges rather than point estimates.
+
+2. **Tighten tolerance** for high-precision requirements:
+   ```python
+   solver.setup(..., tol_feas=1e-10, tol_gap_abs=1e-10, tol_gap_rel=1e-10)
+   ```
+
+3. **Use SOCP formulation** when possible: With P = 0, solutions are typically at cone boundaries (vertices), providing stronger uniqueness and near-zero cross-solver divergence.
+
+4. **Average multiple runs** for critical benchmarks: Run the same backtest 3–5 times and report the mean and standard deviation of performance metrics.
