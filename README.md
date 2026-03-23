@@ -43,7 +43,7 @@ source ~/miniconda3/bin/activate
 
 ## 4. Create and Activate the `cufolio` Environment
 
-The shared library is built with CUDA 12.8: (suggest to use CVXPY v1.8.x)
+The shared library is built with CUDA 12.8: (recommend to use CVXPY v1.8.x)
 
 ```bash
 conda create -n cufolio \
