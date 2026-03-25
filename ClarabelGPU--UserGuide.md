@@ -495,7 +495,7 @@ from clarabel_gpu import (
 | `reduced_tol_infeas_rel` | `5e-5` | |
 | `reduced_tol_ktratio` | `1e-4` | |
 | **Equilibration** | | |
-| `equilibrate_enable` | `False` | Enable Ruiz equilibration |
+| `equilibrate_enable` | `True` | Enable Ruiz equilibration |
 | `equilibrate_max_iter` | `10` | Number of Ruiz iterations |
 | `equilibrate_min_scaling` | `1e-4` | Minimum scaling factor |
 | `equilibrate_max_scaling` | `1e4` | Maximum scaling factor |
@@ -521,6 +521,8 @@ from clarabel_gpu import (
 | `chordal_decomposition_merge_method` | `'clique_graph'` | Merge strategy |
 | `chordal_decomposition_compact` | `True` | Use compact representation |
 | `chordal_decomposition_complete_dual` | `False` | Complete dual variables |
+| **Warm start** | | |
+| `warm_start_enable` | `True` (auto via CVXPY) | Enable IPM smoothing-operator warm start. Automatically set to `True` by the CVXPY integration; for native API, pass explicitly. See §7.3. |
 
 #### Module-Level Functions
 
