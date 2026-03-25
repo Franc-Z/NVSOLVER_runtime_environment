@@ -117,6 +117,12 @@ class ClarabelGPU(ConicSolver):
         "iterative_refinement_abstol": "ir_abstol",
         "iterative_refinement_max_iter": "ir_max_iter",
         "iterative_refinement_stop_ratio": "ir_stop_ratio",
+        "chordal_decomposition_enable": "chordal_decomposition_enable",
+        "equilibrate_enable": "equilibrate_enable",
+        "equilibrate_max_iter": "equilibrate_max_iter",
+        "equilibrate_min_scaling": "equilibrate_min_scaling",
+        "equilibrate_max_scaling": "equilibrate_max_scaling",
+        "warm_start_enable": "warm_start_enable",
     }
 
     _META_OPTS = frozenset({"use_quad_obj", "update_hints", ACCEPT_UNKNOWN})
@@ -314,7 +320,7 @@ class ClarabelGPU(ConicSolver):
 
             return Solution(status, opt_val, primal_vars, dual_vars, attr)
         else:
-            return failure_solution(status, attr, dual_vars)
+            return failure_solution(status, attr)
 
     def cite(self, data):
         return (
@@ -339,6 +345,7 @@ class ClarabelGPU(ConicSolver):
             backend_key = self._SETTING_ALIASES.get(key, key)
             settings[backend_key] = val
         settings.setdefault("verbose", verbose)
+        settings.setdefault("warm_start_enable", True)
         return settings
 
     @staticmethod
