@@ -1,4 +1,4 @@
-# Building the cuFOLIO Runtime Environment (SM_70/80/86/89/90/120)
+# Building the cuFOLIO Runtime Environment (suitable for SM_70/80/86/89/90/120, and Python 3.10~3.13)
 
 > Supported OS: Ubuntu 22.04–24.04, RockyLinux 8–10, CentOS 8-10 etc.
 
