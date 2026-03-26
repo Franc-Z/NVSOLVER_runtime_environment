@@ -49,7 +49,7 @@ The shared library is built with CUDA 12.8: (recommend to use CVXPY v1.8.x)
 conda create -n cufolio \
   -c rapidsai -c conda-forge -c nvidia \
   numpy scipy cupy rmm=25.10 \
-  cvxpy=1.8.1 openmp fmt \
+  cvxpy=1.8.2 openmp fmt \
   cuda-version=12.8 python=3.12
 ```
 
