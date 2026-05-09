@@ -313,7 +313,7 @@ def create_portfolio_qp_model():
     
     # Decision variables - support multi-period problems (fully consistent with Julia code)
     x = cp.Variable((n, T), nonneg=True)  # Portfolio weights: n×T variables
-    y = cp.Variable((k, T), nonneg=True)  # Factor exposures: k×T variables (non-negative constraint in Julia)
+    y = cp.Variable((k, T))  # Factor exposures: k×T variables (non-negative constraint in Julia)
     
     # Add upper bounds on variables for efficiency (fully consistent with Julia)
     constraints = []
